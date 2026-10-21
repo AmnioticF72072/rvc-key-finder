@@ -26,6 +26,10 @@
   `5_HP-Karaoke-UVR.pth`（用于剥和声）。
   - 来源：https://github.com/Anjok07/ultimatevocalremovergui
   - 模型权重由其各自作者在 Hugging Face 上发布，遵循各自许可证。
+- **BS-RoFormer**（`tools/sep_bsroformer.py` 调用）来自
+  [juuxed/BS-RoFormer](https://github.com/juuxed/BS-RoFormer)（MIT），
+  是 SDX23 挑战赛冠军的 band-split RoFormer 架构。
+  本项目只调用其模型与 audio-separator 的推理实现，不分发权重。
 - 本项目**不分发**任何模型权重，仅调用它们。
 
 ### 2.2 RVC 推理框架

@@ -90,9 +90,32 @@ rmvpe 默认；素材周期性低时可试 crepe（抖动实测 8.4→7.6 音分
 两套参数逐秒择优拼接（133 段）→ 音色在接缝处跳变，听感就是"漏电"。
 **单一参数整轨贯穿**，需要退让就用平滑包络，不要切换音色。
 
-### 5.3 低配显卡的可行边界
-6GB（如 CMP 30HX）：BS-RoFormer(639MB) **跑不动**（卡死在显存溢出后的
-CPU 回退）；VR 架构模型（5_HP-Karaoke 127MB）2.5 分钟可跑完。
+### 5.3 低配显卡的可行边界（6GB 实测可跑 BS-RoFormer）
+6GB（如 CMP 30HX）下各模型的实测边界：
+
+| 模型 | 架构 | 大小 | 6GB 下表现 |
+|---|---|---|---|
+| 5_HP-Karaoke-UVR | VR | 127MB | 2.5 分钟跑完整首，**日常首选** |
+| BS-RoFormer (ep_317) | RoFormer | 639MB | **可跑**，显存峰值仅 1.21GB/6GB（见下） |
+
+BS-RoFormer 跑得动的三个关键参数（基于 audio-separator 0.47 现成实现）：
+1. `use_native_fp16=True`（CUDA+bs_roformer 已验证，激活减半）
+2. `segment_size=801`（chunk 8 秒；降到 512 显存同样只有 1.21GB）
+3. `overlap=2`（官方 yaml 是 4，降到 2 计算量减半）
+
+速度实测（CMP 30HX）：3.76x 实时（4 分钟的歌约 15 分钟，比 Karaoke 慢 6 倍）。
+瓶颈不在显存也不在 chunk 大小（5 秒 vs 8 秒只差 15%），是卡本身算力。
+
+⚠️ **必要的运行时补丁**：audio-separator 0.47 的
+`_float32_frequencies` 绕过 `RotaryEmbedding.forward` 直接调 `get_seq_pos`，
+而库里 `default(dtype, self.cached_freqs.dtype)` 会对 None 缓存提前求值，
+**第一次推理必崩**（与精度无关的 regression，fp32/fp16 都崩）。
+修法：给 `get_seq_pos` 打补丁，`cached_freqs` 为 None 时用 float32。
+
+**取舍建议**：Karaoke 模型有 BS 没有的独特价值——它专为**去和声**设计
+（副歌音高乱的主因），且快 6 倍。实测同一首歌低频伴奏残留两者只差 1.4dB。
+BS 的优势在综合 SDR（12.98 vs ~11）：气声/辅音保真更好。
+日常用 Karaoke，这首歌 Karaoke 效果不够时再上 BS。
 
 ## 附：故障速查表
 
