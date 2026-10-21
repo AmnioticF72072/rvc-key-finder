@@ -1,0 +1,10 @@
+# 核心依赖（引擎① 源音频定档）
+numpy>=1.24
+soundfile>=0.12
+soxr>=0.3.7
+
+# 可选：引擎② 读模型权重（read_pitch_range.py）需要
+torch>=2.0
+
+# 可选：频谱匹配（fir_match.py）需要
+librosa>=0.10

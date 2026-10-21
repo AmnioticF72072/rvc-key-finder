@@ -1,0 +1,29 @@
+# 临时/中间产物
+*_pm_tmp/
+*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 成品与源音频（版权内容不入库）
+成品/
+*.mp3
+*.flac
+*.wav
+*.kgm
+*.kgma
+*.vpr
+*.kgg
+
+# 模型权重
+*.pth
+*.index
+*.onnx
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# 本地演示（不进开源仓库）
+仓库预览.html

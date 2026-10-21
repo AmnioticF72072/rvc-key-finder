@@ -1,0 +1,66 @@
+# NOTICE — 来源与第三方致谢
+
+本项目（rvc-key-finder）的所有代码均为原创实现，但站在开源社区的巨人肩膀上。
+以下如实记录：AI 的参与方式，以及本项目引用/依赖/参考的第三方成果。
+
+---
+
+## 一、AI 参与声明
+
+本项目主体代码（`pipeline/`、`tools/` 下的全部 Python 脚本）由 AI 编程助手
+（WorkBuddy，底层为大型语言模型）在人类用户的**调试与实测驱动**下编写。
+
+具体分工：
+- **人类用户**：提供真实翻唱场景、人耳盲测判断、指出"糊/漏电/咬字不清"等
+  听感问题，以及关键决策（如"高音上不去就降调"、"和声是主因"）。
+- **AI 助手**：将这些经验固化为可复现的算法（FFT 自相关、频谱能量裁决、
+  smoothstep 包络、并行压缩等），并负责代码实现、参数扫描与文档撰写。
+
+所有"实测数据"（如"倍频误判 80%"、"能量比 385 万倍"、"电平跳变 210→26dB"）
+均来自本项目在真实歌曲翻唱过程中跑出的测量结果，非编造。
+
+## 二、第三方引用与依赖
+
+### 2.1 模型（UVR 分离模型）
+- 人声/伴奏分离使用 **Ultimate Vocal Remover (UVR)** 的模型，尤其是
+  `5_HP-Karaoke-UVR.pth`（用于剥和声）。
+  - 来源：https://github.com/Anjok07/ultimatevocalremovergui
+  - 模型权重由其各自作者在 Hugging Face 上发布，遵循各自许可证。
+- 本项目**不分发**任何模型权重，仅调用它们。
+
+### 2.2 RVC 推理框架
+- 音色转换推理兼容 **Applio** 的模型格式（`.pth` + `.index`）。
+  - 来源：https://github.com/IAHispano/Applio
+  - Applio 本身基于 **Retrieval-based Voice Conversion (RVC)**，
+    见 https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI
+- 本项目**不内置** RVC 推理代码，用户需自行安装 Applio/RVC 后调用。
+
+### 2.3 音频处理工具
+- **ffmpeg / libavfilter**：用于转码、rubberband 变调、equalizer/firequalizer、
+  acompressor、afftdn 等滤镜。来源：https://ffmpeg.org
+- **rubberband**：变调算法。来源：https://breakfastquay.com/rubberband
+
+### 2.4 Python 库
+- numpy、soundfile、soxr、librosa（可选）——均为 BSD/MIT 等宽松许可证。
+
+### 2.5 算法参考
+- **FFT 加速自相关**、**频谱能量裁决**、**谐波门控**、**并行压缩**、
+  **板式混响冲激响应合成** 等均为通用信号处理技术，参考公开教科书与
+  社区经验（如 Audacity、SoX 文档、各类混音工程讨论），非抄袭特定项目代码。
+- `tools/decrypt_kgm.py` 的 KGM V2 XOR 解密算法，参考了公开的逆向资料
+  （如 unlock-music 项目族、kugou-crypto 等），为**纯标准库的自包含重新实现**，
+  未复制任何第三方代码。
+- **Pitch Embedding Diff（读权重定音域）** 的思路，参考了 RVC 公开的模型结构
+  （`enc_p.emb_pitch`，256 槽 Mel 量化，见 Applio/RVC 源码 `extract.py` 的
+  `coarse_f0`）以及业界关于「模型 embedding 差分可读出 fine-tune 见过什么」
+  的公开讨论（如 verticalrectangle.com 的 "Pitch Embedding Diff" 研究）。
+  本项目的实现为独立编写，仅使用了 RVC 已公开的层名与量化公式。
+
+## 三、合规提醒
+
+- 本项目仅提供"方法 + 工具"，**不内置、不分发任何歌曲、人声模型或版权内容**。
+- 请只对你拥有合法权利的音频使用本工具（如你自己的声音、已获授权的素材）。
+
+---
+
+如果你认为本项目的某段代码或数据遗漏了出处标注，欢迎提交 Issue 指正。
