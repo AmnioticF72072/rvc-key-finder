@@ -1,32 +1,31 @@
 # NOTICE — 来源与第三方致谢
 
-本项目（rvc-key-finder）的所有代码均为原创实现，但站在开源社区的巨人肩膀上。
-以下如实记录：AI 的参与方式，以及本项目引用/依赖/参考的第三方成果。
+这个仓库（rvc-key-finder）的代码是原创写的，但也用到了社区现成的东西。
+这里记一下：哪些是 AI 帮写的，以及引用了哪些第三方。
 
 ---
 
-## 一、AI 参与声明
+## 一、AI 参与说明
 
-本项目主体代码（`pipeline/`、`tools/` 下的全部 Python 脚本）由 AI 编程助手
-（WorkBuddy，底层为大型语言模型）在人类用户的**调试与实测驱动**下编写。
+主体代码（`pipeline/`、`tools/` 下的 Python 脚本）是 AI 编程助手
+（WorkBuddy）写的，但方向和验收是我在管。
 
-具体分工：
-- **人类用户**：提供真实翻唱场景、人耳盲测判断、指出"糊/漏电/咬字不清"等
-  听感问题，以及关键决策（如"高音上不去就降调"、"和声是主因"）。
-- **AI 助手**：将这些经验固化为可复现的算法（FFT 自相关、频谱能量裁决、
-  smoothstep 包络、并行压缩等），并负责代码实现、参数扫描与文档撰写。
+大致分工：
+- **我**：定方向、听成品、判断"糊/漏电/咬字不清"这些问题，做关键决定
+  （比如"高音上不去就降调"、"和声才是主因"）。
+- **AI**：把上面这些写成能跑的算法和代码，做参数扫描、写文档。
 
-所有"实测数据"（如"倍频误判 80%"、"能量比 385 万倍"、"电平跳变 210→26dB"）
-均来自本项目在真实歌曲翻唱过程中跑出的测量结果，非编造。
+文里那些数据（倍频误判 80%、能量比 385 万倍、电平跳变 210→26dB 之类）
+都是实际翻唱时量出来的，不是编的。
 
 ## 二、第三方引用与依赖
 
 ### 2.1 模型（UVR 分离模型）
-- 人声/伴奏分离使用 **Ultimate Vocal Remover (UVR)** 的模型，尤其是
-  `5_HP-Karaoke-UVR.pth`（用于剥和声）。
+- 人声/伴奏分离用 **Ultimate Vocal Remover (UVR)** 的模型，主要
+  `5_HP-Karaoke-UVR.pth`（剥和声用）。
   - 来源：https://github.com/Anjok07/ultimatevocalremovergui
-  - 模型权重由其各自作者在 Hugging Face 上发布，遵循各自许可证。
-- **BS-RoFormer**（`tools/sep_bsroformer.py` 调用）来自
+  - 模型权重由作者发在 Hugging Face 上，各自有许可证。
+- **BS-RoFormer**（`tools/sep_bsroformer.py` 用到）来自
   [juuxed/BS-RoFormer](https://github.com/juuxed/BS-RoFormer)（MIT），
   是 SDX23 挑战赛冠军的 band-split RoFormer 架构。
   本项目只调用其模型与 audio-separator 的推理实现，不分发权重。

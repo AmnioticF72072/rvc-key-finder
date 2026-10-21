@@ -21,9 +21,9 @@
 
 ## 源准备
 
-- **和声是第一大坑**：副歌段"唱得乱"九成是和声叠层混进人声轨，不是参数问题。
+- **和声是最常见的坑**：副歌段"唱得乱"，多数是和声叠层混进了人声轨，不是参数问题。
   用 UVR Karaoke 模型（`5_HP-Karaoke-UVR.pth`）剥和声。
-- 低配显卡（6GB）：BS-RoFormer(639MB) 跑不动，用 VR 架构（5_HP-Karaoke 127MB）。
+- 低配显卡（6GB）：BS-RoFormer(639MB) 能跑（见 PITFALLS 5.3），VR 架构（5_HP-Karaoke 127MB）更快。
 
 ## 零原唱收尾
 

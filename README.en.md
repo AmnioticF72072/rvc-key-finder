@@ -2,27 +2,22 @@
 
 [中文](README.md) · English
 
-**Automatic key detection for RVC song covers — with octave-error protection.**
+A small tool for figuring out the pitch shift when making RVC song covers.
 
-A dual-engine tool that finds the correct pitch-shift (in semitones) for an RVC
-(Retrieval-based Voice Conversion) song cover. It combines two independent
-approaches and cross-validates them — a combination that, to the best of our
-research, does not exist anywhere else in the open-source world.
+The first step of any cover is deciding how many semitones to shift the source
+vocal so it lands in your model's comfortable range. Get this wrong and nothing
+else matters. This tool helps me (and you) get that step right.
 
 ---
 
-## The problem it solves
+## What problem it solves
 
-The very first step of any RVC cover is deciding **how many semitones to shift**
-the source vocal so it lands inside your voice model's comfortable range.
-**Get this wrong and everything downstream is wasted.**
+Most people key an RVC cover like this: run f0 through RMVPE or crepe, look at
+the median, then fill in a "-5" or "-8" by feel. Two things can go wrong there.
 
-Yet almost every tutorial and every existing cover project (AICoverGen,
-xinxin-song, RVC-dstts, Ultimate RVC…) does the same thing:
+### Problem 1: autocorrelation picks the wrong octave
 
-> Run f0 through RMVPE/crepe → **eyeball the median → manually guess "-5 or -8"**.
-
-Two real problems hide here that almost nobody addresses:
+When autocorrelation searches for a peak across 60–1200 Hz, it can lock onto:
 
 ### Problem 1: Autocorrelation picks the wrong octave
 
@@ -42,118 +37,114 @@ shifted "-12" or "0", sounding either piercing or muddy.
 > carrying 3.85 million × the energy of 175 Hz** — 175 Hz was only a subharmonic;
 > 350 Hz was the true fundamental (female voice). The correct answer was "-8".
 
-### Problem 2: Model range is guessed, not read
+### Problem 2: model range is guessed, not read
 
-Almost everyone estimates their model's vocal range by "listening to the
-training material and guessing an upper limit". But the answer is literally
-**stored in the model weights**: RVC's pitch embedding records which pitches the
-model ever saw during training.
+Most people estimate their model's range by listening to the training material
+and guessing an upper limit. But the answer is actually in the weights: RVC's
+pitch embedding records which pitches the model saw during training.
 
 ---
 
-## The two engines (the part nobody else does)
+## What this does
 
-| Existing cover projects | This project |
+| Common approach | Here |
 |---|---|
-| Read f0 median directly | **Dual-range cross-check**: find peaks in 60–250 Hz *and* 60–1200 Hz separately |
-| Ignore octave errors | **Spectral-energy arbitration**: compare energy at f0 vs 2×f0 — whichever is stronger is the fundamental |
-| Guess the shift by hand | **Automatic shift suggestion**: fit the 95th percentile to your material's ceiling, rounded to even semitones |
-| Estimate model range by ear | **Read the weights**: diff the pitch embedding against the base model |
+| Read the f0 median directly | Find peaks in 60–250 Hz *and* 60–1200 Hz separately |
+| Octave errors ignored | Compare energy at f0 vs 2×f0 — whichever is stronger is the fundamental |
+| Shift guessed by hand | Automatic suggestion, rounded to an even number of semitones |
+| Model range estimated by ear | Diff the pitch embedding against the base model |
 
-To the best of our research, the first three do not exist anywhere in the
-RVC-cover niche (generic pitch-detection research has octave-correction, but
-nobody applied it to RVC cover key-finding). And "reading the range off the
-weights" has only a single closed-source precedent (Pop Maker Studio) — this
-project is an independent open implementation that additionally *combines* it
-with source-audio key-finding.
+I didn't find the first three implemented anywhere in the RVC-cover space.
+Generic pitch detection has octave correction, but I haven't seen it applied to
+RVC cover key-finding. The "read the range off the weights" idea has a
+closed-source precedent (Pop Maker Studio); this is an open implementation that
+also combines it with source-audio key-finding.
 
 ---
 
-## Quick start
+## Usage
 
 ```bash
 pip install numpy soundfile soxr
 
-# Dual-engine: source-audio key-finding + model-range from weights
+# both: source-audio key-finding + model range from weights
 python key_finder.py --vocal vocals.wav \
     --model my_model.pth --base base_model.pth --material-max 375
 
-# Engine 1 only (source audio, no torch needed)
+# source audio only (no torch needed)
 python analyze_pitch.py --vocal vocals.wav --material-max 375
 
-# Engine 2 only (read model range from weights)
+# model range only
 python tools/read_pitch_range.py --model my_model.pth --base base_model.pth
 ```
 
 - `--material-max`: the highest *comfortable* pitch (Hz) in your model's
-  training material (this project measures ≈ 375 Hz for its own voice model).
-- `--model` + `--base`: enables engine 2 (requires torch).
+  training material (mine is about 375 Hz).
+- `--model` + `--base`: enables the weights engine (requires torch).
 
-Sample dual-engine output:
+Sample output:
 
 ```
-【Engine 1 · source-audio key-finding】
-Spectral-energy arbitration: 2×low-range / low-range = 3561629.2 ×
+【source-audio key-finding】
+spectral-energy arbitration: 2×low-range / low-range = 3561629.2 ×
   -> 350 Hz is the true fundamental (low range was a subharmonic)
-★ recommended shift: -8 semitones
+recommended shift: -8 semitones
 
-【Engine 2 · model range from weights】
-trained slots: 127 / 256 -> range 53 ~ 940 Hz
+【model range from weights】
+trained slots: 127 / 256 -> 53 ~ 940 Hz
 
-Cross-check: source fundamental 350 Hz falls inside the model range — consistent.
+cross-check: 350 Hz falls inside the model range — consistent.
 ```
 
 ---
 
-## How it works (30 seconds)
+## How it works
 
-### Engine 1 — source audio (octave-error protection)
+### Source audio
 
-1. FFT-accelerated autocorrelation per frame (O(n log n) instead of O(n²))
-2. Find the peak in **two ranges** separately: 60–250 Hz and 60–1200 Hz
-3. When they differ by ≈ 2×, run **spectral-energy arbitration**:
+1. FFT-accelerated autocorrelation per frame
+2. Find the peak in two ranges separately: 60–250 Hz and 60–1200 Hz
+3. When they differ by ≈ 2×, compare energy at f0 vs 2×f0:
    - 2×f0 has significantly more energy → f0 was a subharmonic (female voice)
-   - f0 has significantly more energy → f0 is the true fundamental (male voice)
-4. Take the 95th percentile of the true fundamental → derive the shift in
+   - f0 has significantly more energy → f0 is the fundamental (male voice)
+4. Take the 95th percentile of the true fundamental, derive the shift in
    semitones, rounded to an even number
 
-Pure numpy, no RMVPE/Applio required.
+Pure numpy, no RMVPE/Applio needed.
 
-### Engine 2 — model range (read the weights, no audio)
+### Model range (read the weights, no audio)
 
-RVC encodes pitch with a 256-slot **pitch embedding** (`enc_p.emb_pitch`,
+RVC encodes pitch with a 256-slot pitch embedding (`enc_p.emb_pitch`,
 256×hidden), quantized on the Mel scale (50–1100 Hz). During fine-tuning, only
 the slots whose pitch actually appears in the training audio move relative to
-the base model. Diffing the trained model's embedding against the base model's
-reveals which pitches were seen = the model's range.
+the base model. Diffing the two embeddings shows which pitches were seen.
 
-The two engines are independent and complementary: engine 1 can octave-error,
-engine 2 doesn't measure audio at all; engine 2 reports "which pitches were
-seen" (not "which are comfortable"), which engine 1's material ceiling narrows
-down to a usable range.
+The two approaches are independent and complementary: the source-audio one can
+pick the wrong octave, the weights one doesn't touch audio at all; the weights
+one only says "which pitches were seen" (not "which are comfortable"), which
+the material ceiling narrows down.
 
 ---
 
-## Bundled cover utilities
+## Other tools
 
-`pipeline/` and `tools/` also contain other tools hardened during real cover
-production (zero-original-vocal finishing, harmonic-gate de-bleeding, a
-Pro Max mixing chain, glitch detection, etc.). They are not the focus of this
-repository but are released together as battle-tested artifacts. See
+`pipeline/` and `tools/` also have some things I wrote while making covers
+(zero-original-vocal finishing, de-bleeding, a mixing chain, glitch checking,
+etc.). They're not the focus here, but I left them in. See
 [docs/PITFALLS.md](docs/PITFALLS.md) (Chinese).
 
-## Documentation
+## Docs
 
-- [docs/PITFALLS.md](docs/PITFALLS.md) — pitfall encyclopedia with measured data (Chinese)
+- [docs/PITFALLS.md](docs/PITFALLS.md) — pitfall notes with measurements (Chinese)
 - [docs/RECIPES.md](docs/RECIPES.md) — parameter recipes (Chinese)
-- [NOTICE](NOTICE) — AI-assistance disclosure + third-party attribution
+- [NOTICE](NOTICE) — what was AI-assisted, and third-party attribution
 
 ## License
 
-MIT. Code written by an AI coding assistant driven by a human's debugging and
-measurements (see [NOTICE](NOTICE)).
+MIT. Most of the code was written by an AI assistant; I did the debugging,
+measurements and direction (see [NOTICE](NOTICE)).
 
 ## Disclaimer
 
-This project ships no songs, voice models, or copyrighted material. Use it only
-on audio you have the rights to.
+There are no songs, voice models or copyrighted material here, just tools and
+methods. Only use it on audio you have the rights to.
