@@ -159,14 +159,28 @@ def analyze(path, material_max=0.0, sr_t=48000):
     if material_max > 0:
         p95 = np.percentile(real, 95)
         need = -12 * np.log2(p95 / material_max)
-        cand = min([0, -2, -4, -6, -8, -10, -12], key=lambda k: abs(k - need))
+        # ★ 必须取「不超过 need 的那个偶数半音」，也就是比 need 更负的档位。
+        #   原来用 min(cands, key=|k-need|) 取最近档 —— need=-4.4 时最近的是 -4，
+        #   但降完 95% 仍是 383Hz，反而超过素材上限 375Hz，
+        #   等于推荐值自我违背了上面这句"保证不超过上限"。
+        cands = [0, -2, -4, -6, -8, -10, -12]
+        ok = [k for k in cands if p95 * 2 ** (k / 12) <= material_max + 1e-9]
+        if ok:
+            cand = max(ok)          # 满足约束里最省的那个（最接近 0）
+        else:
+            cand = min(cands)       # 连 -12 都不够，只能给最大档并明确警告
         print("素材上限 %.0f Hz -> 全曲 95%%(%.0fHz) 需降 %.1f 半音" % (material_max, p95, -need))
         print("★ 推荐定档: %d 半音" % cand)
+        if not ok:
+            print("   ⚠ 连降 12 半音都会超出上限（%.0f Hz）—— 这首歌音区明显超出该模型，"
+                  "建议换素材更高的模型，或只唱低音段。" % (p95 * 2 ** (cand / 12)))
         for k in sorted(set([cand - 2, cand, cand + 2])):
             if -14 <= k <= 0:
-                print("   降 %2d: 95%% %.0f Hz%s" %
-                      (k, p95 * 2 ** (k / 12),
-                       "  <= 推荐" if k == cand else ""))
+                after = p95 * 2 ** (k / 12)
+                print("   降 %2d: 95%% %.0f Hz%s%s" %
+                      (k, after,
+                       "  <= 推荐" if k == cand else "",
+                       "" if after <= material_max else "  （超上限）"))
     else:
         print("（未指定 --material-max，跳过降调量建议）")
     return real

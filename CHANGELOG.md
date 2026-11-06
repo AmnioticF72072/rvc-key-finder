@@ -13,6 +13,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   model.
 
 ### Fixed
+- Shift suggestion no longer contradicts the material limit. It used to pick
+  the even semitone *nearest* to the required shift, so `need = -4.4` became
+  `-4` and the resulting 95th percentile (383 Hz) exceeded `--material-max`
+  (375 Hz) — the exact constraint the docstring promises. It now picks the
+  closest even semitone that actually satisfies the limit (`-6` here, 341 Hz),
+  marks over-limit rows in the table, and warns when even −12 is not enough.
 - Spectral-energy arbitration in `analyze_pitch.py`: the correct octave-error
   test compares energy at **f0 vs 2×f0** (not f0 vs f0/2). Verified on a real
   case — G.E.M. "Where Did U Go" (175 Hz was a subharmonic; 350 Hz was the true
