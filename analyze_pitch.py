@@ -90,11 +90,11 @@ def band_energy(s, sr, f0, bw=8.0):
 
 def analyze(path, material_max=0.0, sr_t=48000):
     x, sr = load_mono(path, sr_t)
-    secs = len(x) // sr
 
-    lo_f, full_f, confs = [], [], []
-    for i in range(0, len(x) - sr // 2, sr // 2):
-        s = x[i:i + sr // 2]
+    lo_f, full_f, at = [], [], []
+    step = sr // 2
+    for i in range(0, len(x) - step, step):
+        s = x[i:i + step]
         if np.sqrt((s ** 2).mean()) < 3e-4:
             continue
         lf, _ = f0_in_range(s, sr, 60, 250)
@@ -103,9 +103,11 @@ def analyze(path, material_max=0.0, sr_t=48000):
             continue
         lo_f.append(lf)
         full_f.append(ff)
+        at.append(i)           # 记住这段在文件里的位置，下面能量裁决要用
 
     lo_f = np.array(lo_f)
     full_f = np.array(full_f)
+    at = np.array(at, dtype=np.int64)
     if lo_f.size == 0:
         print("未检测到有效人声，请确认输入是分离后的 vocals 轨")
         return None
@@ -125,30 +127,41 @@ def analyze(path, material_max=0.0, sr_t=48000):
     # 正确判据：直接比较【低范围候选 f0】与【2×f0】的能量——
     #   若 2×f0 能量显著更强 → 真基频是 2×f0（低范围是次谐波，女声常见）；
     #   若 f0 能量显著更强 → f0 是真基频（男声）。
-    real = lo_f
-    W = sr * 5
-    n = len(x) // W
-    e = np.array([np.sqrt((x[k * W:(k + 1) * W] ** 2).mean()) for k in range(n)])
-    k0 = int(np.argmax(e)) if n else 0
-    seg = x[k0 * W:(k0 + 2) * W]
     f_low = float(np.median(lo_f))
+    W = sr * 5
+    # ★ 取样片段必须和被测频率自洽。以前固定取"全曲最响的 10 秒"，
+    #   如果最响的那段正好在副歌高音区，却拿低音区的中位数去量它的能量，
+    #   两个频率都对不上，裁决结果等于随机（这是这套算法最隐蔽的一处）。
+    #   现在：在"lo_f 接近全曲中位"的段里挑最响的一段。
+    near = np.abs(lo_f - f_low) <= f_low * 0.15
+    pick_pool = np.where(near)[0]
+    if pick_pool.size == 0:
+        pick_pool = np.arange(lo_f.size)
+    loud = [float(np.sqrt((x[int(i):int(i) + W] ** 2).mean())) for i in pick_pool]
+    pick = int(pick_pool[int(np.argmax(loud))])
+    a0 = max(0, int(at[pick]) - W // 2)
+    seg = x[a0:a0 + W]
+
     e_f0 = band_energy(seg, sr, f_low)
     e_2f0 = band_energy(seg, sr, f_low * 2)
     energy_ratio = e_2f0 / (e_f0 + 1e-30)
-    print("频谱能量裁决: 2×低范围/低范围 = %.1f 倍" % energy_ratio)
+    print("频谱能量裁决: 2×低范围/低范围 = %.1f 倍（取样 %.1f~%.1f 秒）"
+          % (energy_ratio, a0 / sr, (a0 + len(seg)) / sr))
+    is_low = True
     if energy_ratio > 2:
         # 2×f0 能量显著更强 → 低范围是次谐波，真基频在 2 倍处（女声）
-        real = full_f
+        is_low = False
         print("  -> %.0f Hz 是真实基频（低范围是次谐波误判，女声常见）" % np.median(full_f))
     elif energy_ratio < 0.5:
-        real = lo_f
+        is_low = True
         print("  -> %.0f Hz 是真实基频（能量显著强于 2 倍频）" % f_low)
     else:
-        real = lo_f if octave_ratio > 0.5 else full_f
-        print("  -> 能量不明确，按倍频比例取 %s" % ("低范围(男声)" if real is lo_f else "高范围"))
+        is_low = bool(octave_ratio > 0.5)
+        print("  -> 能量不明确，按倍频比例取 %s" % ("低范围(男声)" if is_low else "高范围"))
+    real = lo_f if is_low else full_f
 
     print("-" * 60)
-    label = "真实基频" if real is full_f else "真实音域(60-250)"
+    label = "真实音域(60-250)" if is_low else "真实基频"
     print("%s: 中位 %.0f | 5%% %.0f | 95%% %.0f | 最大 %.0f Hz"
           % (label, np.median(real), np.percentile(real, 5),
              np.percentile(real, 95), real.max()))

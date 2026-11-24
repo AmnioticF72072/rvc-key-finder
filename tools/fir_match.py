@@ -149,7 +149,6 @@ def main():
     for f, a, b, c in zip(grid, t, i, g):
         if f < 40:
             continue
-        step = 1 if f < 200 else (2 if f < 1000 else 4)
         bar = ("+" if c > 0 else "-") * min(int(abs(c) * 1.4), 24)
         print(" %-9.0f %10.1f %10.1f %+10.2f  %s" % (f, a, b, c, bar))
     print("-" * 76)

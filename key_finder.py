@@ -75,7 +75,7 @@ def main():
             print("\n[跳过引擎②] 底模文件不存在: %s" % args.base)
         else:
             print("\n【引擎② 模型音域（Pitch Embedding Diff）】")
-            from tools.read_pitch_range import read_range, describe, bin2hz
+            from tools.read_pitch_range import read_range, describe
             idx, diff, thr = read_range(args.model, args.base, args.thr)
             model_range = describe(idx, diff, thr)
     elif args.model and not args.base:
